@@ -187,6 +187,10 @@ export class EntityStoreDataClient {
       namespace,
       kibanaVersion,
     });
+
+    logger.warn(
+      `KUBA LOG IN CONSTRUCTOR`
+    );
   }
 
   private async getEngineComponentsState(

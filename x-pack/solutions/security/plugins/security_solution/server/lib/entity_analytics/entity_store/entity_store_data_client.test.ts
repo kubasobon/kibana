@@ -148,6 +148,10 @@ describe('EntityStoreDataClient', () => {
       esClientMock.search.mockResolvedValue(emptySearchResponse);
     });
 
+    it('KUBA TEST TEST', async() => {
+      expect(true).toEqual(false);
+    });
+
     it('searches in the entities store indices', async () => {
       await dataClient.searchEntities({
         ...defaultSearchParams,
