@@ -10,7 +10,7 @@ import type {
   SecuritySolutionPluginStartDependencies,
 } from '../../plugin_contract';
 import { Plugin as SecuritySolutionPlugin } from '../../plugin';
-import { type EntityStoreDataClient } from '../../lib/entity_analytics/entity_store';
+import type { EntityStoreDataClient } from '../../lib/entity_analytics/entity_store';
 
 export function getEntityStoreDataClient(
   spy: jest.SpyInstance<
@@ -24,7 +24,10 @@ export function getEntityStoreDataClient(
   }
   const plugin = pluginInstances[0];
   if (plugin instanceof SecuritySolutionPlugin) {
-    console.log(`KUBA: plugin: ${JSON.stringify(plugin)}`);
+    console.log('KUBAKUBAKUBA START');
+    console.log(plugin);
+    console.log('KUBAKUBAKUBA END');
+    // console.log(`KUBA: plugin: ${JSON.stringify(plugin)}`);
     /* eslint dot-notation: "off" */
     const dataClient = plugin['enityStore'];
     if (dataClient instanceof EntityStoreDataClient) {
