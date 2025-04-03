@@ -15,6 +15,7 @@ import type { GetEntityStoreStatusResponse } from '../../../../solutions/securit
 export default function (providerContext: FtrProviderContext) {
   // const logger = getService('log');
   const supertest = providerContext.getService('supertest');
+  const retry = providerContext.getService('retry');
 
   describe('GET /api/entity_store/status', () => {
 
@@ -68,15 +69,23 @@ export default function (providerContext: FtrProviderContext) {
         expect(response.body.succeeded).to.eql(true);
       });
 
-      it("Should return 200 and status 'running'", async () => {
-        const { body } = await supertest
-          .get('/api/entity_store/status')
-          .expect(200);
+      it("Should return 200 and status 'running' for all engines", async () => {
+        await retry.waitForWithTimeout('Entity Store to initialize', 5 * 60 * 1000, async () => {
+            const { body } = await supertest
+              .get('/api/entity_store/status')
+              .query({include_components: true})
+              .expect(200)
+            expect(body.status).to.eql('running', `KUBA GOT THIS ${JSON.stringify(body)}`);
+            return true;
+        });
 
+        const response = await supertest
+          .get('/api/entity_store/status')
+          .expect(200)
         // const response: GetEntityStoreStatusResponse = body as GetEntityStoreStatusResponse
         // THIS SHOULD HAPPEN, BUT LET ME DEBUG
-        // expect(body.status).to.eql('running');
-        expect(body.status).to.eql('installing');
+        expect(response.body.status).to.eql('running');
+        // Additional tests for all engines...
       });
     });
   });
