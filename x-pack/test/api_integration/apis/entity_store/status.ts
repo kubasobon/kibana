@@ -75,17 +75,23 @@ export default function (providerContext: FtrProviderContext) {
               .get('/api/entity_store/status')
               .query({include_components: true})
               .expect(200)
-            expect(body.status).to.eql('running', `KUBA GOT THIS ${JSON.stringify(body)}`);
+            expect(body.status).to.eql('running');
             return true;
         });
 
-        const response = await supertest
+        const { body } = await supertest
           .get('/api/entity_store/status')
+          .query({include_components: true})
           .expect(200)
-        // const response: GetEntityStoreStatusResponse = body as GetEntityStoreStatusResponse
-        // THIS SHOULD HAPPEN, BUT LET ME DEBUG
-        expect(response.body.status).to.eql('running');
-        // Additional tests for all engines...
+
+        const response: GetEntityStoreStatusResponse = body as GetEntityStoreStatusResponse
+        expect(response.status).to.eql('running');
+        for (const engine of response.engines) {
+          expect(engine.status).to.eql('started');
+          for (const component of engine.components) {
+            expect(component.installed).to.be(true);
+          }
+        }
       });
     });
   });
@@ -107,6 +113,10 @@ type entityStoreStatusResponse = {
       filter: string
       enrichPolicyExecutionInterval: string
       timestampField: string
+      components: {
+        id: string
+        installed: boolean
+      }[]
   }[]
 }
 */
