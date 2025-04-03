@@ -9,7 +9,6 @@ import {
   ELASTIC_HTTP_VERSION_HEADER,
 } from '@kbn/core-http-common';
 import { FtrProviderContext } from '@kbn/ftr-common-functional-services';
-// ???
 import type { GetEntityStoreStatusResponse } from '../../../../solutions/security/plugins/security_solution/common/api/entity_analytics/entity_store/status.gen'
 
 export default function (providerContext: FtrProviderContext) {
@@ -32,7 +31,7 @@ export default function (providerContext: FtrProviderContext) {
 
     describe('running', () => {
       before(async () => {
-        // Initialize security solution by visiting a single view.
+        // Initialize security solution by creating a prerequisite index pattern.
         // Helps avoid "Error initializing entity store: Data view not found 'security-solution-default'"
         let response = await supertest
           .post('/api/content_management/rpc/create')
@@ -60,16 +59,15 @@ export default function (providerContext: FtrProviderContext) {
         expect(response.statusCode).to.eql(200);
 
 
-        // And now we can enable the Entity Store
+        // And now we can enable the Entity Store...
         response = await supertest
           .post('/api/entity_store/enable')
           .set('kbn-xsrf', 'xxxx')
           .send({});
         expect(response.statusCode).to.eql(200);
         expect(response.body.succeeded).to.eql(true);
-      });
 
-      it("Should return 200 and status 'running' for all engines", async () => {
+        // and wait for it to start up
         await retry.waitForWithTimeout('Entity Store to initialize', 5 * 60 * 1000, async () => {
             const { body } = await supertest
               .get('/api/entity_store/status')
@@ -78,7 +76,9 @@ export default function (providerContext: FtrProviderContext) {
             expect(body.status).to.eql('running');
             return true;
         });
+      });
 
+      it("Should return 200 and status 'running' for all engines", async () => {
         const { body } = await supertest
           .get('/api/entity_store/status')
           .query({include_components: true})
