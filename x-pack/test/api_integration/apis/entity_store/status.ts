@@ -11,10 +11,10 @@ import {
 import { FtrProviderContext } from '@kbn/ftr-common-functional-services';
 import type { GetEntityStoreStatusResponse } from '../../../../solutions/security/plugins/security_solution/common/api/entity_analytics/entity_store/status.gen'
 
-const HOST_TRANSFORM_ID: string = 'entities-v1-latest-security_host_default';
-const TIMEOUT_MS: number = 300000; // 5 minutes
 const DATASTREAM_NAME: string = 'logs-elastic_agent.cloudbeat-test';
+const HOST_TRANSFORM_ID: string = 'entities-v1-latest-security_host_default';
 const INDEX_NAME: string = '.entities.v1.latest.security_host_default';
+const TIMEOUT_MS: number = 300000; // 5 minutes
 
 export default function (providerContext: FtrProviderContext) {
   const supertest = providerContext.getService('supertest');
@@ -35,9 +35,6 @@ export default function (providerContext: FtrProviderContext) {
     });
 
     describe('running', () => {
-      // TODO: not needed anymore?
-      // let index_name: string = '';
-
       before(async () => {
         // Initialize security solution by creating a prerequisite index pattern.
         // Helps avoid "Error initializing entity store: Data view not found 'security-solution-default'"
@@ -68,15 +65,8 @@ export default function (providerContext: FtrProviderContext) {
 
         // Create a test index matching transform's pattern to store test documents
         await es.indices.createDataStream({name: DATASTREAM_NAME});
-        /* TODO: not needed anymore?
-        response = await es.indices.getDataStream({name: DATASTREAM_NAME});
-        expect(response.data_streams.length).to.eql(1)
-        expect(response.data_streams[0].indices.length).to.eql(1);
-        index_name = response.data_streams[0].indices[0].index_name;
-        expect(index_name.length).to.greaterThan(0);
-        */
 
-        // And now we can enable the Entity Store...
+        // Now we can enable the Entity Store...
         response = await supertest
           .post('/api/entity_store/enable')
           .set('kbn-xsrf', 'xxxx')
@@ -116,6 +106,8 @@ export default function (providerContext: FtrProviderContext) {
       });
 
       it('Should successfully trigger a host transform', async () => {
+        const HOST_NAME: string = 'host-transform-test-ip'
+        const IPs: string[] = ['1.1.1.1', '2.2.2.2']
         let response = await es.transform.getTransformStats({
           transform_id: HOST_TRANSFORM_ID,
         });
@@ -125,34 +117,13 @@ export default function (providerContext: FtrProviderContext) {
         const triggerCount: number = transform.stats.trigger_count;
         const docsProcessed: number = transform.stats.documents_processed;
 
-        // TODO: Insert the 2 documents
-        const isoTimestamp: string = (new Date).toISOString().split('.')[0];
-
-        const { _id: documentID, result } = await es.index({
-          index: DATASTREAM_NAME,
-          document: {
-            '@timestamp': isoTimestamp, // TODO: make it automatically assign correct timestamp in the last 24h
-            host: {
-              name: 'kuba-test', // MANDATORY
-              ip: '1.1.1.1',
-            },
-          },
-        })
-        expect(result).to.eql('created');
-
-        // Document no 2.
-        const { _id: documentID2, result: result2 } = await es.index({
-          index: DATASTREAM_NAME,
-          document: {
-            // THE TIMESTAMP HAS TO BE VERY RECENT
-            '@timestamp': isoTimestamp, // TODO: make it automatically assign correct timestamp in the last 24h
-            host: {
-              name: 'kuba-test', // MANDATORY
-              ip: '2.2.2.2',
-            },
-          },
-        })
-        expect(result2).to.eql('created');
+        // Create two documents with the same host.name, different IPs
+        for (let ip of IPs) {
+          const { result } = await es.index(
+            buildHostTransformDocument(HOST_NAME, {ip: ip})
+          );
+          expect(result).to.eql('created');
+        }
 
         // Trigger the transform manually
         const { acknowledged } = await es.transform.scheduleNowTransform({
@@ -170,19 +141,18 @@ export default function (providerContext: FtrProviderContext) {
           return true;
         });
 
-        // TODO: Check if the document changed
         await retry.waitForWithTimeout('Document to be processed and transformed', TIMEOUT_MS, async () => {
           const result = await es.search({
             index: INDEX_NAME,
             query: {
               term: {
-                "host.name": 'kuba-test',
+                "host.name": HOST_NAME,
               },
             },
           })
           expect(result.hits.total.value).to.eql(1);
-          expect(result.hits.hits[0]._source.host.name).to.eql('kuba-test');
-          expect(result.hits.hits[0]._source.host.ip).to.eql(['1.1.1.1', '2.2.2.2']);
+          expect(result.hits.hits[0]._source.host.name).to.eql(HOST_NAME);
+          expect(result.hits.hits[0]._source.host.ip).to.eql(IPs);
 
           return true;
         })
@@ -190,28 +160,32 @@ export default function (providerContext: FtrProviderContext) {
       });
     });
   });
-
 }
 
-/*
-type entityStoreStatusResponse = {
-  status: string
-  engines: {
-      status: string
-      type: string
-      delay: string
-      timeout: string
-      frequency: string
-      lookbackPeriod: string
-      fieldHistoryLength: number
-      indexPattern: string
-      filter: string
-      enrichPolicyExecutionInterval: string
-      timestampField: string
-      components: {
-        id: string
-        installed: boolean
-      }[]
-  }[]
+type hostObject = {
+  domain: string
+  hostname: string
+  id: string
+  os: {
+    name: string
+    type: string
+  },
+  ip: string
+  mac: string
+  type: string
+  architecture: string
 }
-*/
+
+function buildHostTransformDocument(name: string, host: hostObject): Object {
+  // Get timestamp without the millisecond part
+  const isoTimestamp: string = (new Date).toISOString().split('.')[0];
+  let document: Object = {
+    index: DATASTREAM_NAME,
+    document: {
+      '@timestamp': isoTimestamp,
+      host: host,
+    },
+  }
+  document.document.host.name = name;
+  return document
+}
